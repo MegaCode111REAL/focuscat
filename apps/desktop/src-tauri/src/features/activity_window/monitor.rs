@@ -29,6 +29,7 @@ pub fn start_monitoring(app: AppHandle) {
     let monitor = MadoWindowMonitor::with_config(
         handler,
         MonitorConfig {
+            reconcile_interval_ms: 0,
             include_app_icon: true,
             include_app_color: true,
             include_browser_info: !cfg!(feature = "app-store"),
@@ -392,6 +393,7 @@ impl WindowListener for WindowMonitor {
                 });
             }
             WindowEvent::AppTerminated { .. }
+            | WindowEvent::WindowUpdated { .. }
             | WindowEvent::WindowBoundsChanged { .. }
             | WindowEvent::WindowMinimized { .. }
             | WindowEvent::WindowRestored { .. }
