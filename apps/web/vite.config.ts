@@ -23,7 +23,17 @@ export default defineConfig(async () => ({
 		tanstackStart({
 			srcDirectory: 'src'
 		}),
-		nitro(),
+		nitro({
+			routeRules: {
+				// Note: Cache assets in the browser to reduce repeated CDN requests
+				'/illustrations/cat/**': {
+					headers: { 'cache-control': 'public, max-age=86400, must-revalidate' }
+				},
+				'/audio/**': {
+					headers: { 'cache-control': 'public, max-age=86400, must-revalidate' }
+				}
+			}
+		}),
 		viteReact(),
 		tailwindcss()
 	]

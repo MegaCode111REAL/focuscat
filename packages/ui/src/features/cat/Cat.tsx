@@ -13,60 +13,44 @@ export const Cat = React.forwardRef<TCatRef, TCatProps>((props, ref) => {
 		className,
 		onTap
 	} = props;
-	const [leftHand, setLeftHand] = React.useState<TCatHand>('up');
-	const [rightHand, setRightHand] = React.useState<TCatHand>('up');
-	const [lastHand, setLastHand] = React.useState<'left' | 'right'>('right');
-	const cooldownUntil = React.useRef(0);
+	const [leftHandPose, setLeftHandPose] = React.useState<TCatHand>('up');
+	const [rightHandPose, setRightHandPose] = React.useState<TCatHand>('up');
+	const lastTappedHandRef = React.useRef<'left' | 'right'>('right');
+	const cooldownUntilRef = React.useRef(0);
 
-	const { basePath, leftHandPath, rightHandPath, facePath, hatPath } = React.useMemo(() => {
-		return {
-			basePath: catConfig.parts.fur.path.base(fur),
-			leftHandPath: catConfig.parts.fur.path.leftHand(fur, leftHand),
-			rightHandPath: catConfig.parts.fur.path.rightHand(fur, rightHand),
-			facePath: catConfig.parts.face.path(face),
-			hatPath: hat != null ? catConfig.parts.hat.path(hat) : null
-		};
-	}, [fur, leftHand, rightHand, face, hat]);
-
-	const { bottomOffset, containerHeight } = React.useMemo(() => {
-		const offset = catConfig.baseBodyBottomOffset * (size / catConfig.baseSize);
-		return {
-			bottomOffset: position === 'edge' ? offset : 0,
-			containerHeight: position === 'edge' ? size - offset : size
-		};
-	}, [size, position]);
+	const bottomOffset =
+		position === 'edge' ? catConfig.baseBodyBottomOffset * (size / catConfig.baseSize) : 0;
+	const containerHeight = size - bottomOffset;
 
 	// MARK: - Actions
 
-	const tap = React.useCallback(
-		(options: TTapOptions = {}) => {
-			const { mode = lastHand === 'right' ? 'left' : 'right', cooldown = catConfig.tapThrottleMs } =
-				options;
+	const tap = React.useCallback((options: TTapOptions = {}) => {
+		const {
+			mode = lastTappedHandRef.current === 'right' ? 'left' : 'right',
+			cooldown = catConfig.tapThrottleMs
+		} = options;
 
-			if (cooldown !== 0 && Date.now() < cooldownUntil.current) {
-				return;
-			}
+		if (cooldown !== 0 && Date.now() < cooldownUntilRef.current) {
+			return;
+		}
 
-			if (mode === 'left' || mode === 'both') {
-				setLeftHand('down');
-				setTimeout(() => setLeftHand('up'), 100);
-			}
-			if (mode === 'right' || mode === 'both') {
-				setRightHand('down');
-				setTimeout(() => setRightHand('up'), 100);
-			}
-			if (mode !== 'both') {
-				setLastHand(mode);
-			}
+		if (mode === 'left' || mode === 'both') {
+			setLeftHandPose('down');
+			setTimeout(() => setLeftHandPose('up'), 100);
+		}
+		if (mode === 'right' || mode === 'both') {
+			setRightHandPose('down');
+			setTimeout(() => setRightHandPose('up'), 100);
+		}
+		if (mode !== 'both') {
+			lastTappedHandRef.current = mode;
+		}
 
-			cooldownUntil.current = Date.now() + cooldown;
-		},
-		[lastHand]
-	);
+		cooldownUntilRef.current = Date.now() + cooldown;
+	}, []);
 
 	const handleTap = React.useCallback(() => {
-		const tapOptions = onTap?.() as TTapOptions | undefined;
-		tap({ ...tapOptions, cooldown: 0 });
+		tap({ ...(onTap?.() ?? {}), cooldown: 0 });
 	}, [tap, onTap]);
 
 	// MARK: - Effects
@@ -92,37 +76,51 @@ export const Cat = React.forwardRef<TCatRef, TCatProps>((props, ref) => {
 				}}
 			>
 				<img
-					src={basePath}
+					src={catConfig.parts.fur.path.base(fur)}
 					alt=""
 					draggable={false}
 					className="absolute inset-0 h-full w-full select-none"
 				/>
-				<img
-					src={leftHandPath}
-					alt=""
-					draggable={false}
-					className="absolute inset-0 h-full w-full select-none"
-				/>
-				<img
-					src={facePath}
-					alt=""
-					draggable={false}
-					className="absolute inset-0 h-full w-full select-none"
-				/>
-				{hatPath != null && (
+				{/* Note: Keep both paw poses mounted to avoid image requests during taps */}
+				{catConfig.parts.hand.available.map((pose) => (
 					<img
-						src={hatPath}
+						key={pose}
+						src={catConfig.parts.fur.path.leftHand(fur, pose)}
+						alt=""
+						draggable={false}
+						className={cn(
+							'absolute inset-0 h-full w-full select-none',
+							pose !== leftHandPose && 'invisible'
+						)}
+					/>
+				))}
+				<img
+					src={catConfig.parts.face.path(face)}
+					alt=""
+					draggable={false}
+					className="absolute inset-0 h-full w-full select-none"
+				/>
+				{hat != null && (
+					<img
+						src={catConfig.parts.hat.path(hat)}
 						alt=""
 						draggable={false}
 						className="absolute inset-0 h-full w-full select-none"
 					/>
 				)}
-				<img
-					src={rightHandPath}
-					alt=""
-					draggable={false}
-					className="absolute inset-0 h-full w-full select-none"
-				/>
+				{/* Note: Keep both paw poses mounted to avoid image requests during taps */}
+				{catConfig.parts.hand.available.map((pose) => (
+					<img
+						key={pose}
+						src={catConfig.parts.fur.path.rightHand(fur, pose)}
+						alt=""
+						draggable={false}
+						className={cn(
+							'absolute inset-0 h-full w-full select-none',
+							pose !== rightHandPose && 'invisible'
+						)}
+					/>
+				))}
 			</div>
 		</div>
 	);
