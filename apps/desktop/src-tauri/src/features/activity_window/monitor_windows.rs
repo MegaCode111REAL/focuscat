@@ -3,7 +3,8 @@ use super::repository::{
     WindowActivityRepository,
 };
 use crate::environment::db::DatabaseState;
-use crate::features::app::repository::{AppRepository, UpsertAppInput};
+use crate::common::url::extract_domain;
+use crate::features::app::repository::{AppRepository, UpsertAppInput, UpsertWebsiteInput, WebsiteRepository};
 use crate::features::blocking::types::BlockerState;
 use crate::features::settings::types::AppSettingsState;
 use active_win_pos_rs::get_active_window;
@@ -27,6 +28,7 @@ struct ForegroundSnapshot {
     y: f64,
     width: f64,
     height: f64,
+    browser_url: Option<String>,
 }
 
 struct ActiveRecord {
@@ -39,6 +41,8 @@ struct ActiveWindowRecord {
     app_id: i64,
     app_key: String,
     title: String,
+    browser_url: Option<String>,
+    website_id: Option<i64>,
     window_id: Option<u32>,
     x: f64,
     y: f64,
@@ -92,6 +96,8 @@ fn read_foreground() -> Option<ForegroundSnapshot> {
         .parse::<u32>()
         .ok();
 
+    let browser_url = browser_url::get_active_browser_url().ok().map(|info| info.url);
+
     Some(ForegroundSnapshot {
         pid: window.process_id as i32,
         app_key,
@@ -103,6 +109,7 @@ fn read_foreground() -> Option<ForegroundSnapshot> {
         y: window.position.y,
         width: window.position.width,
         height: window.position.height,
+        browser_url,
     })
 }
 
@@ -119,7 +126,7 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
         blocker.handle_window_changed(
             snapshot.pid,
             Some(&snapshot.app_key),
-            None,
+            snapshot.browser_url.as_deref(),
             Some((snapshot.x, snapshot.y, snapshot.width, snapshot.height)),
         );
     }
@@ -145,6 +152,20 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
         Err(_) => return,
     };
 
+    let website_id = snapshot.browser_url.as_deref()
+        .and_then(extract_domain)
+        .and_then(|domain| Some((domain, snapshot.browser_url.clone())))
+        .map(|(domain, _url)| async {
+            WebsiteRepository::upsert(
+                &db.pool,
+                &UpsertWebsiteInput { domain, name: None, icon: None, color: None },
+            ).await.ok()
+        });
+    let website_id = match website_id {
+        Some(future) => future.await.flatten(),
+        None => None,
+    };
+
     let old = app.state::<WindowsActivityState>().take();
     let mut app_started_at = now;
 
@@ -168,14 +189,14 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
                 &db.pool,
                 &InsertWindowActivityInput {
                     app_id: previous_window.app_id,
-                    website_id: None,
+                    website_id: previous_window.website_id,
                     window_title: Some(previous_window.title),
                     window_id: previous_window.window_id,
                     window_x: Some(previous_window.x),
                     window_y: Some(previous_window.y),
                     window_width: Some(previous_window.width),
                     window_height: Some(previous_window.height),
-                    browser_url: None,
+                    browser_url: previous_window.browser_url,
                     browser_is_private: None,
                     started_at: previous_window.started_at,
                     ended_at: now,
@@ -195,6 +216,8 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
             app_id,
             app_key: snapshot.app_key,
             title: snapshot.title,
+            browser_url: snapshot.browser_url,
+            website_id,
             window_id: snapshot.window_id,
             x: snapshot.x,
             y: snapshot.y,
