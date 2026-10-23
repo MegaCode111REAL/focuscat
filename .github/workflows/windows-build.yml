@@ -46,7 +46,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build desktop workspace dependencies
-        run: pnpm exec turbo run build --filter='@repo/desktop^...'
+        run: pnpm --filter @repo/ui build
 
       - name: Build desktop UI
         run: pnpm --filter @repo/desktop ui:build
