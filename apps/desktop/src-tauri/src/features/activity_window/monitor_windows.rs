@@ -12,6 +12,7 @@ use crate::features::focus_profile::{
 };
 use crate::features::settings::types::AppSettingsState;
 use active_win_pos_rs::get_active_window;
+use uiautomation::{types::{ControlType, UIProperty}, UIAutomation};
 use chrono::Utc;
 use std::{
     sync::Mutex,
@@ -100,7 +101,10 @@ fn read_foreground() -> Option<ForegroundSnapshot> {
         .parse::<u32>()
         .ok();
 
-    let browser_url = browser_url::get_active_browser_url().ok().map(|info| info.url);
+    let browser_url = browser_url::get_active_browser_url()
+        .ok()
+        .map(|info| info.url)
+        .or_else(|| read_browser_url_fallback(&window.title));
 
     Some(ForegroundSnapshot {
         pid: window.process_id as i32,
@@ -235,4 +239,55 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
             started_at: now,
         },
     );
+}
+
+
+fn read_browser_url_fallback(window_title: &str) -> Option<String> {
+    if window_title.trim().is_empty() {
+        return None;
+    }
+
+    let automation = UIAutomation::new().ok()?;
+    let root = automation.get_root_element().ok()?;
+    let browser = automation
+        .create_matcher()
+        .from(root)
+        .timeout(700)
+        .name(window_title)
+        .find_first()
+        .ok()?;
+
+    // Chromium-derived browsers expose the address bar as an Edit control.
+    // Prefer its accessible name, then fall back to the first Edit control.
+    let address = automation
+        .create_matcher()
+        .from(browser.clone())
+        .timeout(700)
+        .name("Address and search bar")
+        .find_first()
+        .or_else(|_| {
+            automation
+                .create_matcher()
+                .from(browser)
+                .timeout(700)
+                .control_type(ControlType::Edit)
+                .find_first()
+        })
+        .ok()?;
+
+    let value = address
+        .get_property_value(UIProperty::ValueValue)
+        .ok()?
+        .get_string()
+        .ok()?;
+    let value = value.trim();
+    if value.is_empty() || !value.contains('.') {
+        return None;
+    }
+
+    if value.starts_with("http://") || value.starts_with("https://") {
+        Some(value.to_string())
+    } else {
+        Some(format!("https://{value}"))
+    }
 }
