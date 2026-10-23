@@ -110,24 +110,30 @@ function RouteComponent() {
 	}, []);
 
 	const handleRandomize = React.useCallback(() => {
-		const faces = catConfig.parts.face.available;
-		const hats: (TCatHat | null)[] = [...catConfig.parts.hat.available, null]; // Add null to allow for no hat
+		const faces = catConfig.parts.face.available as TCatFace[];
+		const hats: (TCatHat | null)[] = [...catConfig.parts.hat.available, null];
 		const currentFace = settings.cat.equippedFace;
 		const currentHat = settings.cat.equippedHat;
 
-		// Randomize face and hat until they are different from the current one
-		let nextFace: TCatFace = currentFace;
-		let nextHat: TCatHat | null = currentHat;
-		while (nextFace === currentFace && nextHat === currentHat) {
-			nextFace = faces[Math.floor(Math.random() * faces.length)] as TCatFace;
-			nextHat = hats[Math.floor(Math.random() * hats.length)] ?? null;
-		}
+		// Choose from valid alternatives instead of retrying randomly in a loop.
+		// This guarantees the UI thread cannot get stuck if there is only one
+		// available combination.
+		const alternatives = faces.flatMap((face) =>
+			hats
+				.filter((hat) => face !== currentFace || hat !== currentHat)
+				.map((hat) => ({ face, hat }))
+		);
+
+		if (alternatives.length === 0) return;
+
+		const next = alternatives[Math.floor(Math.random() * alternatives.length)];
+		if (!next) return;
 
 		settingsCx.update({
 			cat: {
 				equippedFur: settings.cat.equippedFur,
-				equippedFace: nextFace,
-				equippedHat: nextHat
+				equippedFace: next.face,
+				equippedHat: next.hat
 			}
 		});
 	}, [settingsCx, settings.cat]);
