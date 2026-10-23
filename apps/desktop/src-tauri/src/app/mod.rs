@@ -154,7 +154,7 @@ pub fn run() {
             blocking::setup(app);
             activity_window::setup(app);
             app_feature::setup(app);
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             tray::setup(app);
             #[cfg(all(desktop, not(feature = "app-store"), not(debug_assertions)))]
             updater::setup(app.handle());
