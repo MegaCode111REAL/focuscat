@@ -45,11 +45,14 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check Windows Rust backend
-        run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
-
       - name: Build desktop workspace dependencies
         run: pnpm exec turbo run build --filter='@repo/desktop^...'
+
+      - name: Build desktop UI
+        run: pnpm --filter @repo/desktop ui:build
+
+      - name: Check Windows Rust backend
+        run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
 
       - name: Build Windows desktop installer
         run: pnpm --filter @repo/desktop build
