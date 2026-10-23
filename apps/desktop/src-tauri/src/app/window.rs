@@ -180,8 +180,15 @@ impl Window {
         };
 
         let (card_w, card_h) = self.size();
-        let center_x = x + (width - card_w) / 2.0;
-        let center_y = y + (height - card_h) / 2.0;
+        #[cfg(target_os = "windows")]
+        let scale = window.scale_factor().unwrap_or(1.0);
+        #[cfg(not(target_os = "windows"))]
+        let scale = 1.0;
+
+        // Window-monitor bounds are physical pixels on Windows, while Tauri's
+        // LogicalPosition and configured window dimensions use logical pixels.
+        let center_x = (x + (width - card_w * scale) / 2.0) / scale;
+        let center_y = (y + (height - card_h * scale) / 2.0) / scale;
 
         let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(
             center_x, center_y,
