@@ -912,5 +912,5 @@ fn find_executable_in_install_dir(value: &str) -> Option<PathBuf> {
 
 #[cfg(target_os = "windows")]
 fn normalize_windows_path(path: &Path) -> String {
-    path.to_string_lossy().replace('/', "\\\\").to_lowercase()
+    path.to_string_lossy().replace('/', "\\").to_lowercase()
 }
