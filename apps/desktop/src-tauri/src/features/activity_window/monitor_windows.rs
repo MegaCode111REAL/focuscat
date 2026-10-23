@@ -101,10 +101,18 @@ fn read_foreground() -> Option<ForegroundSnapshot> {
         .parse::<u32>()
         .ok();
 
-    let browser_url = browser_url::get_active_browser_url()
-        .ok()
-        .map(|info| info.url)
-        .or_else(|| read_browser_url_fallback(&window.title));
+    let app_name_lower = window.app_name.to_lowercase();
+    let is_browser = ["chrome", "firefox", "msedge", "edge", "brave", "opera", "vivaldi", "zen"]
+        .iter()
+        .any(|name| app_name_lower.contains(name) || process_path.to_lowercase().contains(name));
+    let browser_url = if is_browser {
+        browser_url::get_active_browser_url()
+            .ok()
+            .map(|info| info.url)
+            .or_else(|| read_browser_url_fallback(&window.title))
+    } else {
+        None
+    };
 
     Some(ForegroundSnapshot {
         pid: window.process_id as i32,
