@@ -110,7 +110,7 @@ function RouteComponent() {
 	}, []);
 
 	const handleRandomize = React.useCallback(() => {
-		const faces = catConfig.parts.face.available as TCatFace[];
+		const faces: TCatFace[] = [...catConfig.parts.face.available];
 		const hats: (TCatHat | null)[] = [...catConfig.parts.hat.available, null];
 		const currentFace = settings.cat.equippedFace;
 		const currentHat = settings.cat.equippedHat;
