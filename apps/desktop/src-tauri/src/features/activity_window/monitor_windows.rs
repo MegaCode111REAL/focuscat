@@ -90,7 +90,7 @@ pub fn start_monitoring(app: AppHandle) {
 
 fn read_foreground() -> Option<ForegroundSnapshot> {
     let window = get_active_window().ok()?;
-    let process_path = window.process_path.trim().to_string();
+    let process_path = window.process_path.to_string_lossy().trim().to_string();
     if process_path.is_empty() {
         return None;
     }
