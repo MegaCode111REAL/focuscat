@@ -125,7 +125,15 @@ pub fn open_data_directory(app: AppHandle) -> Result<(), String> {
             .map_err(|e| format!("Failed to open directory: {}", e))?;
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(&data_dir_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open directory: {}", e))?;
+    }
+
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     {
         Command::new("xdg-open")
             .arg(&data_dir_path)
