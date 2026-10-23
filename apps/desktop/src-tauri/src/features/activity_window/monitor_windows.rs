@@ -292,9 +292,10 @@ fn read_browser_url_fallback(window_title: &str) -> Option<String> {
         return None;
     }
 
-    if value.starts_with("http://") || value.starts_with("https://") {
-        Some(value.to_string())
+    let candidate = if value.starts_with("http://") || value.starts_with("https://") {
+        value.to_string()
     } else {
-        Some(format!("https://{value}"))
-    }
+        format!("https://{value}")
+    };
+    extract_domain(&candidate).map(|_| candidate)
 }
