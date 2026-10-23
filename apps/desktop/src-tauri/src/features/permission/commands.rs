@@ -2,7 +2,15 @@
 #[tauri::command]
 #[specta::specta]
 pub fn is_accessibility_granted() -> bool {
-    mado::is_accessibility_trusted()
+    #[cfg(target_os = "windows")]
+    {
+        // Windows does not require macOS-style Accessibility permission.
+        return true;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        mado::is_accessibility_trusted()
+    }
 }
 
 /// Open System Settings to Accessibility pane.
