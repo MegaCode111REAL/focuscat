@@ -88,18 +88,19 @@ pub fn hide_cat_window(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 #[specta::specta]
 pub fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
-    Window::Main.hide(&app).map_err(|e| e.to_string())?;
+    // Show the destination first so a creation error cannot leave the app hidden.
     Window::Settings.show(&app).map_err(|e| e.to_string())?;
+    Window::Main.hide(&app).map_err(|e| e.to_string())?;
     return Ok(());
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn show_settings_window_at_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    Window::Main.hide(&app).map_err(|e| e.to_string())?;
     Window::Settings
         .show_at_path(&app, &path)
         .map_err(|e| e.to_string())?;
+    Window::Main.hide(&app).map_err(|e| e.to_string())?;
     return Ok(());
 }
 
@@ -122,8 +123,8 @@ pub fn navigate_settings_window_to_path(app: tauri::AppHandle, path: String) -> 
 #[tauri::command]
 #[specta::specta]
 pub fn show_activity_window(app: tauri::AppHandle) -> Result<(), String> {
-    Window::Main.hide(&app).map_err(|e| e.to_string())?;
     Window::Activity.show(&app).map_err(|e| e.to_string())?;
+    Window::Main.hide(&app).map_err(|e| e.to_string())?;
     return Ok(());
 }
 
@@ -135,10 +136,10 @@ pub fn show_activity_window_at_session(
 ) -> Result<(), String> {
     let path = format!("/window/activity/{}", session_id);
 
-    Window::Main.hide(&app).map_err(|e| e.to_string())?;
     Window::Activity
         .show_at_path(&app, &path)
         .map_err(|e| e.to_string())?;
+    Window::Main.hide(&app).map_err(|e| e.to_string())?;
     return Ok(());
 }
 
