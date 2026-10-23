@@ -200,7 +200,7 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
                     window_y: Some(previous_window.y),
                     window_width: Some(previous_window.width),
                     window_height: Some(previous_window.height),
-                    browser_url: previous_window.browser_url,
+                    browser_url: previous_window.browser_url.clone(),
                     browser_is_private: None,
                     started_at: previous_window.started_at,
                     ended_at: now,
