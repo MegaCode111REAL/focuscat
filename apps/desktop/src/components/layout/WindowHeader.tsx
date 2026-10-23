@@ -14,10 +14,12 @@ export const WindowHeader: React.FC<TWindowHeaderProps> = (props) => {
 		void install();
 	}, [install]);
 
-	const handleMinimize = React.useCallback(() => {
-		void getCurrentWindow().minimize().catch((error) => {
+	const handleMinimize = React.useCallback(async () => {
+		try {
+			await getCurrentWindow().minimize();
+		} catch (error) {
 			console.error('FocusCat could not minimize the window:', error);
-		});
+		}
 	}, []);
 
 	const handleFullscreen = React.useCallback(async () => {
@@ -29,16 +31,16 @@ export const WindowHeader: React.FC<TWindowHeaderProps> = (props) => {
 		}
 	}, []);
 
-	const handleClose = React.useCallback(() => {
-		// The native close handler keeps the app in the tray, matching existing behaviour.
-		void getCurrentWindow().close().catch((error) => {
+	const handleClose = React.useCallback(async () => {
+		try {
+			await getCurrentWindow().close();
+		} catch (error) {
 			console.error('FocusCat could not close the window:', error);
-		});
+		}
 	}, []);
 
 	return (
 		<header
-			data-tauri-drag-region
 			className={cn(
 				'border-base-200 bg-base-50 flex h-8 shrink-0 items-center border-b select-none',
 				platform === 'macos' ? 'pl-[70px]' : 'pl-2',
@@ -69,7 +71,7 @@ export const WindowHeader: React.FC<TWindowHeaderProps> = (props) => {
 						type="button"
 						title="Toggle fullscreen"
 						aria-label="Toggle fullscreen"
-						onClick={() => void handleFullscreen()}
+						onClick={handleFullscreen}
 						className="group flex size-3 items-center justify-center rounded-full bg-[#28c840] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#28c840]"
 					>
 						<Maximize2 className="size-2 text-black/80 opacity-0 group-hover:opacity-100" strokeWidth={3} />
@@ -105,7 +107,9 @@ export const WindowHeader: React.FC<TWindowHeaderProps> = (props) => {
 					<RefreshCcwIcon size={12} className={installing ? 'animate-spin' : undefined} />
 				</Badge>
 			)}
-			<div data-tauri-drag-region className="flex-1" />
+			{/* Only the empty part of the header is draggable. Keeping the whole header
+			    as a drag region causes Tauri to swallow clicks on its child buttons. */}
+			<div data-tauri-drag-region className="flex-1 self-stretch" />
 			{children != null && <div className="flex items-center gap-0.5 pr-1">{children}</div>}
 		</header>
 	);
