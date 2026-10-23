@@ -45,5 +45,8 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build desktop workspace dependencies
+        run: pnpm exec turbo run build --filter='@repo/desktop^...'
+
       - name: Build Windows desktop installer
         run: pnpm --filter @repo/desktop build
