@@ -1,10 +1,6 @@
 name: Windows desktop build
 
 on:
-  push:
-    branches:
-      - develop
-      - windows-port
   pull_request:
     branches:
       - develop
