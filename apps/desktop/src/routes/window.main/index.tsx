@@ -72,8 +72,16 @@ function RouteComponent() {
 
 	const handleMinimize = React.useCallback(async () => {
 		try {
-			await specta.commands.showCatWindow();
-			await specta.commands.hideMainWindow();
+			const shown = await specta.commands.showCatWindow();
+			if (shown.status !== 'ok') {
+				throw new Error(String(shown.error));
+			}
+
+			// Only hide the main window after the cat widget has actually opened.
+			const hidden = await specta.commands.hideMainWindow();
+			if (hidden.status !== 'ok') {
+				throw new Error(String(hidden.error));
+			}
 		} catch (error) {
 			console.error('FocusCat could not switch to the cat widget:', error);
 		}
@@ -81,7 +89,10 @@ function RouteComponent() {
 
 	const handleSettings = React.useCallback(async () => {
 		try {
-			await specta.commands.showSettingsWindow();
+			const result = await specta.commands.showSettingsWindow();
+			if (result.status !== 'ok') {
+				throw new Error(String(result.error));
+			}
 		} catch (error) {
 			console.error('FocusCat could not open Settings:', error);
 		}
@@ -89,7 +100,10 @@ function RouteComponent() {
 
 	const handleActivity = React.useCallback(async () => {
 		try {
-			await specta.commands.showActivityWindow();
+			const result = await specta.commands.showActivityWindow();
+			if (result.status !== 'ok') {
+				throw new Error(String(result.error));
+			}
 		} catch (error) {
 			console.error('FocusCat could not open Activity:', error);
 		}
