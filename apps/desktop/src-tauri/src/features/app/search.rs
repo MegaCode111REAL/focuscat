@@ -1,7 +1,12 @@
 use super::matcher::fuzzy_match;
 use super::types::{App, SearchableItem, Website};
 use crate::common::url::{extract_domain, is_domain_like};
+#[cfg(not(target_os = "windows"))]
 use mado::{get_app_icon, get_installed_apps, InstalledAppsConfig};
+#[cfg(target_os = "windows")]
+use std::path::{Path, PathBuf};
+#[cfg(target_os = "windows")]
+use winreg::{enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE}, RegKey};
 use std::collections::HashSet;
 
 pub struct AppSearch {
@@ -105,9 +110,15 @@ impl AppSearch {
         if app.icon.is_some() {
             return;
         }
-        let data = get_app_icon(&app.bundle_id, 64, true);
-        app.icon = data.data_url;
-        app.color = data.color;
+        #[cfg(not(target_os = "windows"))]
+        {
+            let data = get_app_icon(&app.bundle_id, 64, true);
+            app.icon = data.data_url;
+            app.color = data.color;
+        }
+        // Windows installed-app enumeration uses executable paths as stable IDs.
+        // Icon extraction is intentionally kept separate so an inaccessible or
+        // malformed vendor icon cannot break the search cache.
     }
 
     fn populate_website_icon(website: &mut Website) {
@@ -139,16 +150,24 @@ impl AppSearch {
     }
 
     fn load_apps() -> Vec<SearchableItem> {
-        let config = InstalledAppsConfig {
-            include_icon: false,
-            include_app_color: false,
-            icon_size: 0,
-        };
+        #[cfg(not(target_os = "windows"))]
+        {
+            let config = InstalledAppsConfig {
+                include_icon: false,
+                include_app_color: false,
+                icon_size: 0,
+            };
 
-        return get_installed_apps(config)
-            .into_iter()
-            .map(|app| SearchableItem::app(app.bundle_id, Some(app.name)))
-            .collect();
+            return get_installed_apps(config)
+                .into_iter()
+                .map(|app| SearchableItem::app(app.bundle_id, Some(app.name)))
+                .collect();
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            return load_windows_installed_apps();
+        }
     }
 
     /// Build groups and individual website items from predefined services.
@@ -816,4 +835,82 @@ struct PredefinedService {
     name: &'static str,
     domains: &'static [&'static str],
     bundle_ids: &'static [&'static str],
+}
+
+
+#[cfg(target_os = "windows")]
+fn load_windows_installed_apps() -> Vec<SearchableItem> {
+    use std::collections::HashSet;
+
+    let mut apps = Vec::new();
+    let mut seen = HashSet::new();
+    let roots = [
+        (HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+        (HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+        (HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+    ];
+
+    for (hive, path) in roots {
+        let root = RegKey::predef(hive);
+        let Ok(uninstall) = root.open_subkey(path) else { continue };
+        for entry in uninstall.enum_keys().flatten() {
+            let Ok(key) = uninstall.open_subkey(&entry) else { continue };
+            let name: String = match key.get_value("DisplayName") {
+                Ok(name) if !name.trim().is_empty() => name,
+                _ => continue,
+            };
+            let icon: Option<String> = key.get_value("DisplayIcon").ok();
+            let install_location: Option<String> = key.get_value("InstallLocation").ok();
+            let executable = icon
+                .as_deref()
+                .and_then(parse_display_icon)
+                .filter(|p| p.is_file())
+                .or_else(|| install_location.as_deref().and_then(find_executable_in_install_dir));
+            let Some(executable) = executable else { continue };
+            let id = normalize_windows_path(&executable);
+            if seen.insert(id.clone()) {
+                apps.push(SearchableItem::app(id, Some(name)));
+            }
+        }
+    }
+
+    apps.sort_by(|a, b| a.name().to_lowercase().cmp(&b.name().to_lowercase()));
+    apps
+}
+
+#[cfg(target_os = "windows")]
+fn parse_display_icon(value: &str) -> Option<PathBuf> {
+    let trimmed = value.trim();
+    let path = if let Some(rest) = trimmed.strip_prefix('"') {
+        rest.split('"').next()?
+    } else {
+        trimmed.rsplit_once(',').map(|(path, _)| path).unwrap_or(trimmed).trim()
+    };
+    let path = PathBuf::from(path);
+    if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("exe")) {
+        Some(path)
+    } else {
+        None
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn find_executable_in_install_dir(value: &str) -> Option<PathBuf> {
+    let root = Path::new(value.trim());
+    if !root.is_dir() {
+        return None;
+    }
+    let entries = std::fs::read_dir(root).ok()?;
+    for entry in entries.flatten().take(200) {
+        let path = entry.path();
+        if path.is_file() && path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("exe")) {
+            return Some(path);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn normalize_windows_path(path: &Path) -> String {
+    path.to_string_lossy().replace('/', "\\\\").to_lowercase()
 }
