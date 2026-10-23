@@ -11,6 +11,7 @@ import {
 	TimerView,
 	type TCatRef
 } from '@repo/ui';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { createFileRoute } from '@tanstack/react-router';
 import { useFeatureState, useListener } from 'feature-react/state';
 import React from 'react';
@@ -26,6 +27,32 @@ export const Route = createFileRoute('/window/main/')({
 
 function RouteComponent() {
 	const catRef = React.useRef<TCatRef>(null);
+	const [isFullscreen, setIsFullscreen] = React.useState(false);
+
+	React.useEffect(() => {
+		const window = getCurrentWindow();
+		let unlisten: (() => void) | undefined;
+		let cancelled = false;
+
+		void window.isFullscreen().then(setIsFullscreen).catch((error) => {
+			console.error('FocusCat could not read fullscreen state:', error);
+		});
+		void window.onResized(() => {
+			void window.isFullscreen().then(setIsFullscreen).catch((error) => {
+				console.error('FocusCat could not read fullscreen state:', error);
+			});
+		}).then((stopListening) => {
+			if (cancelled) stopListening();
+			else unlisten = stopListening;
+		}).catch((error) => {
+			console.error('FocusCat could not listen for window resizing:', error);
+		});
+
+		return () => {
+			cancelled = true;
+			unlisten?.();
+		};
+	}, []);
 
 	const settingsCx = useSettingsCx();
 	const settings = useFeatureState(settingsCx.$appSettings);
@@ -116,7 +143,7 @@ function RouteComponent() {
 	// MARK: - UI
 
 	return (
-		<div className="bg-base-0 flex h-screen w-[300px] flex-col">
+		<div className={`bg-base-0 flex h-screen ${isFullscreen ? 'w-screen' : 'w-[300px]'} flex-col`}>
 			<WindowHeader showWindowControls>
 				{settings.features.catWindow && (
 					<IconButton
