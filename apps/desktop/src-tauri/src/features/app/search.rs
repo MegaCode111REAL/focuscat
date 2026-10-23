@@ -855,7 +855,7 @@ fn load_windows_installed_apps() -> Vec<SearchableItem> {
         let Ok(uninstall) = root.open_subkey(path) else { continue };
         for entry in uninstall.enum_keys().flatten() {
             let Ok(key) = uninstall.open_subkey(&entry) else { continue };
-            let name: String = match key.get_value("DisplayName") {
+            let name: String = match key.get_value::<String, _>("DisplayName") {
                 Ok(name) if !name.trim().is_empty() => name,
                 _ => continue,
             };
