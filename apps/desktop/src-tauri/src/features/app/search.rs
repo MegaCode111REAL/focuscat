@@ -874,6 +874,24 @@ fn load_windows_installed_apps() -> Vec<SearchableItem> {
         }
     }
 
+    // Packaged Microsoft Store apps commonly expose execution aliases here.
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        let aliases = Path::new(&local_app_data).join("Microsoft").join("WindowsApps");
+        if let Ok(entries) = std::fs::read_dir(aliases) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() || !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("exe")) {
+                    continue;
+                }
+                let id = normalize_windows_path(&path);
+                if seen.insert(id.clone()) {
+                    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Application").to_string();
+                    apps.push(SearchableItem::app(id, Some(name)));
+                }
+            }
+        }
+    }
+
     apps.sort_by(|a, b| a.name().to_lowercase().cmp(&b.name().to_lowercase()));
     apps
 }
