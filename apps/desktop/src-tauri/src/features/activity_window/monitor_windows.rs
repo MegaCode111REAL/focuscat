@@ -74,7 +74,7 @@ pub fn start_monitoring(app: AppHandle) {
         let mut last_signature = String::new();
         loop {
             if let Some(snapshot) = read_foreground() {
-                let signature = format!("{}|{}|{}", snapshot.pid, snapshot.app_key, snapshot.title);
+                let signature = format!("{}|{}|{}|{}", snapshot.pid, snapshot.app_key, snapshot.title, snapshot.browser_url.as_deref().unwrap_or(""));
                 if signature != last_signature {
                     last_signature = signature;
                     let app_handle = app.clone();
@@ -130,7 +130,6 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
 
     if let Some(blocker) = app.try_state::<BlockerState>() {
         let mut blocker = blocker.lock().unwrap();
-        blocker.handle_app_activated(snapshot.pid, Some(&snapshot.app_key));
         blocker.handle_window_changed(
             snapshot.pid,
             Some(&snapshot.app_key),
