@@ -6,6 +6,10 @@ use crate::environment::db::DatabaseState;
 use crate::common::url::extract_domain;
 use crate::features::app::repository::{AppRepository, UpsertAppInput, UpsertWebsiteInput, WebsiteRepository};
 use crate::features::blocking::types::BlockerState;
+use crate::features::focus_profile::{
+    resolution::{resolve_category_for_app, resolve_category_for_website},
+    types::FocusProfileState,
+};
 use crate::features::settings::types::AppSettingsState;
 use active_win_pos_rs::get_active_window;
 use chrono::Utc;
@@ -161,6 +165,9 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
         None
     };
 
+    let profiles = app.try_state::<FocusProfileState>()
+        .map(|state| state.lock().unwrap().active_profiles.clone())
+        .unwrap_or_default();
     let old = app.state::<WindowsActivityState>().take();
     let mut app_started_at = now;
 
@@ -174,7 +181,9 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
                     app_id: previous_app.app_id,
                     started_at: previous_app.started_at,
                     ended_at: now,
-                    category: None,
+                    category: Some(
+                        resolve_category_for_app(&previous_app.app_key, &profiles).0.as_str().to_string()
+                    ),
                 },
             ).await;
         }
@@ -195,7 +204,12 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
                     browser_is_private: None,
                     started_at: previous_window.started_at,
                     ended_at: now,
-                    category: None,
+                    category: Some(
+                        previous_window.browser_url.as_deref()
+                            .and_then(extract_domain)
+                            .map(|domain| resolve_category_for_website(&domain, &profiles).0.as_str().to_string())
+                            .unwrap_or_else(|| resolve_category_for_app(&previous_window.app_key, &profiles).0.as_str().to_string())
+                    ),
                 },
             ).await;
         }
