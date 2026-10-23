@@ -11,6 +11,7 @@ use tauri::{
 // MARK: - Setup
 
 pub fn setup(app: &mut App) {
+    #[cfg(target_os = "macos")]
     app.set_activation_policy(tauri::ActivationPolicy::Accessory);
     app.manage(TrayState::init(app));
 }
