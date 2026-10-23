@@ -152,18 +152,13 @@ async fn record_change(app: AppHandle, snapshot: ForegroundSnapshot) {
         Err(_) => return,
     };
 
-    let website_id = snapshot.browser_url.as_deref()
-        .and_then(extract_domain)
-        .and_then(|domain| Some((domain, snapshot.browser_url.clone())))
-        .map(|(domain, _url)| async {
-            WebsiteRepository::upsert(
-                &db.pool,
-                &UpsertWebsiteInput { domain, name: None, icon: None, color: None },
-            ).await.ok()
-        });
-    let website_id = match website_id {
-        Some(future) => future.await.flatten(),
-        None => None,
+    let website_id = if let Some(domain) = snapshot.browser_url.as_deref().and_then(extract_domain) {
+        WebsiteRepository::upsert(
+            &db.pool,
+            &UpsertWebsiteInput { domain, name: None, icon: None, color: None },
+        ).await.ok()
+    } else {
+        None
     };
 
     let old = app.state::<WindowsActivityState>().take();
