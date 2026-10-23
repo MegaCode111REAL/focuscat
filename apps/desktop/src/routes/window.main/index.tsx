@@ -44,16 +44,28 @@ function RouteComponent() {
 	// MARK: - Actions
 
 	const handleMinimize = React.useCallback(async () => {
-		await specta.commands.showCatWindow();
-		await specta.commands.hideMainWindow();
+		try {
+			await specta.commands.showCatWindow();
+			await specta.commands.hideMainWindow();
+		} catch (error) {
+			console.error('FocusCat could not switch to the cat widget:', error);
+		}
 	}, []);
 
 	const handleSettings = React.useCallback(async () => {
-		await specta.commands.showSettingsWindow();
+		try {
+			await specta.commands.showSettingsWindow();
+		} catch (error) {
+			console.error('FocusCat could not open Settings:', error);
+		}
 	}, []);
 
 	const handleActivity = React.useCallback(async () => {
-		await specta.commands.showActivityWindow();
+		try {
+			await specta.commands.showActivityWindow();
+		} catch (error) {
+			console.error('FocusCat could not open Activity:', error);
+		}
 	}, []);
 
 	const handleRandomize = React.useCallback(() => {
@@ -105,7 +117,7 @@ function RouteComponent() {
 
 	return (
 		<div className="bg-base-0 flex h-screen w-[300px] flex-col">
-			<WindowHeader>
+			<WindowHeader showWindowControls>
 				{settings.features.catWindow && (
 					<IconButton
 						variant="bare"
