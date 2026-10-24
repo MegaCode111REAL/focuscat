@@ -29,7 +29,7 @@
 		"README.md"
 	],
 	"scripts": {
-		"build": "shx rm -rf dist && rollup -c rollup.config.js && pnpm build:css",
+		"build": "shx rm -rf dist && rollup -c rollup.config.js && pnpm exec tsc --emitDeclarationOnly --declaration --declarationDir ./dist/types && pnpm build:css",
 		"build:css": "shx cp ./src/styles/theme.css ./dist/theme.css && pnpm exec tailwindcss -i ./src/styles/tailwind.css -o ./dist/tailwind.css",
 		"build:prod": "export NODE_ENV=production && pnpm build",
 		"clean": "shx rm -rf dist && shx rm -rf .turbo && shx rm -rf node_modules",

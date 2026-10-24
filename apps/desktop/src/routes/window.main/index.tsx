@@ -11,6 +11,7 @@ import {
 	TimerView,
 	type TCatRef
 } from '@repo/ui';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { createFileRoute } from '@tanstack/react-router';
 import { useFeatureState, useListener } from 'feature-react/state';
 import React from 'react';
@@ -26,6 +27,32 @@ export const Route = createFileRoute('/window/main/')({
 
 function RouteComponent() {
 	const catRef = React.useRef<TCatRef>(null);
+	const [isFullscreen, setIsFullscreen] = React.useState(false);
+
+	React.useEffect(() => {
+		const window = getCurrentWindow();
+		let unlisten: (() => void) | undefined;
+		let cancelled = false;
+
+		void window.isFullscreen().then(setIsFullscreen).catch((error) => {
+			console.error('FocusCat could not read fullscreen state:', error);
+		});
+		void window.onResized(() => {
+			void window.isFullscreen().then(setIsFullscreen).catch((error) => {
+				console.error('FocusCat could not read fullscreen state:', error);
+			});
+		}).then((stopListening) => {
+			if (cancelled) stopListening();
+			else unlisten = stopListening;
+		}).catch((error) => {
+			console.error('FocusCat could not listen for window resizing:', error);
+		});
+
+		return () => {
+			cancelled = true;
+			unlisten?.();
+		};
+	}, []);
 
 	const settingsCx = useSettingsCx();
 	const settings = useFeatureState(settingsCx.$appSettings);
@@ -44,37 +71,69 @@ function RouteComponent() {
 	// MARK: - Actions
 
 	const handleMinimize = React.useCallback(async () => {
-		await specta.commands.showCatWindow();
-		await specta.commands.hideMainWindow();
+		try {
+			const shown = await specta.commands.showCatWindow();
+			if (shown.status !== 'ok') {
+				throw new Error(String(shown.error));
+			}
+
+			// Only hide the main window after the cat widget has actually opened.
+			const hidden = await specta.commands.hideMainWindow();
+			if (hidden.status !== 'ok') {
+				throw new Error(String(hidden.error));
+			}
+		} catch (error) {
+			console.error('FocusCat could not switch to the cat widget:', error);
+		}
 	}, []);
 
 	const handleSettings = React.useCallback(async () => {
-		await specta.commands.showSettingsWindow();
+		try {
+			const result = await specta.commands.showSettingsWindow();
+			if (result.status !== 'ok') {
+				throw new Error(String(result.error));
+			}
+		} catch (error) {
+			console.error('FocusCat could not open Settings:', error);
+		}
 	}, []);
 
 	const handleActivity = React.useCallback(async () => {
-		await specta.commands.showActivityWindow();
+		try {
+			const result = await specta.commands.showActivityWindow();
+			if (result.status !== 'ok') {
+				throw new Error(String(result.error));
+			}
+		} catch (error) {
+			console.error('FocusCat could not open Activity:', error);
+		}
 	}, []);
 
 	const handleRandomize = React.useCallback(() => {
-		const faces = catConfig.parts.face.available;
-		const hats: (TCatHat | null)[] = [...catConfig.parts.hat.available, null]; // Add null to allow for no hat
+		const faces: TCatFace[] = [...catConfig.parts.face.available];
+		const hats: (TCatHat | null)[] = [...catConfig.parts.hat.available, null];
 		const currentFace = settings.cat.equippedFace;
 		const currentHat = settings.cat.equippedHat;
 
-		// Randomize face and hat until they are different from the current one
-		let nextFace: TCatFace = currentFace;
-		let nextHat: TCatHat | null = currentHat;
-		while (nextFace === currentFace && nextHat === currentHat) {
-			nextFace = faces[Math.floor(Math.random() * faces.length)] as TCatFace;
-			nextHat = hats[Math.floor(Math.random() * hats.length)] ?? null;
-		}
+		// Choose from valid alternatives instead of retrying randomly in a loop.
+		// This guarantees the UI thread cannot get stuck if there is only one
+		// available combination.
+		const alternatives = faces.flatMap((face) =>
+			hats
+				.filter((hat) => face !== currentFace || hat !== currentHat)
+				.map((hat) => ({ face, hat }))
+		);
+
+		if (alternatives.length === 0) return;
+
+		const next = alternatives[Math.floor(Math.random() * alternatives.length)];
+		if (!next) return;
 
 		settingsCx.update({
 			cat: {
 				equippedFur: settings.cat.equippedFur,
-				equippedFace: nextFace,
-				equippedHat: nextHat
+				equippedFace: next.face,
+				equippedHat: next.hat
 			}
 		});
 	}, [settingsCx, settings.cat]);
@@ -104,8 +163,8 @@ function RouteComponent() {
 	// MARK: - UI
 
 	return (
-		<div className="bg-base-0 flex h-screen w-[300px] flex-col">
-			<WindowHeader>
+		<div className={`bg-base-0 flex h-screen ${isFullscreen ? 'w-screen' : 'w-[300px]'} flex-col`}>
+			<WindowHeader showWindowControls>
 				{settings.features.catWindow && (
 					<IconButton
 						variant="bare"
